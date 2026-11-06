@@ -286,3 +286,179 @@ end
 
 -- Executa a geração assim que o jogo liga
 gerarJogo()
+-- LocalScript dentro de StarterPlayer -> StarterPlayerScripts
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+
+-- Configurações da Câmera Atari
+local DISTANCIA_CAMERA = 30 -- Distância (em blocos) que a câmera fica afastada do jogador
+local ALTURA_CAMERA = 4      -- Altura extra para a câmera não ficar grudada no chão
+
+-- Altera o tipo da câmera para podermos controlá-la via script
+camera.CameraType = Enum.CameraType.Scriptable
+
+local function atualizarCamera()
+	local character = player.Character
+	if not character then return end
+	
+	local rootPart = character:FindFirstChild("HumanoidRootPart")
+	if not rootPart then return end
+	
+	local posicaoJogador = rootPart.Position
+	
+	-- Mantém a câmera alinhada no eixo X e Y do jogador, mas travada no eixo Z
+	-- Isso cria o visual perfeito de jogo de plataforma/lateral clássico
+	local posicaoAlvo = Vector3.new(posicaoJogador.X, posicaoJogador.Y + ALTURA_CAMERA, posicaoJogador.Z + DISTANCIA_CAMERA)
+	
+	-- Faz a câmera olhar diretamente para onde o jogador está
+	local olharPara = Vector3.new(posicaoJogador.X, posicaoJogador.Y + ALTURA_CAMERA, posicaoJogador.Z)
+	
+	-- Atualiza a posição e rotação da câmera de forma suave
+	camera.CFrame = CFrame.lookAt(posicaoAlvo, olharPara)
+end
+
+-- Roda a função em cada frame do jogo para garantir que a câmera não se atrase
+RunService.RenderStepped:Connect(atualizarCamera)
+-- Script dentro de ServerScriptService
+local DataStoreService = game:GetService("DataStoreService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
+
+-- Acessa o banco de dados do seu jogo
+local meuJogoDataStore = DataStoreService:GetDataStore("SalvarPontos_v2026")
+
+-- ⚠️ SUBSTITUA O "0" PELO ID DO SEU PRODUTO CRIADO NO PAINEL DO ROBLOX CREATOR
+local ID_PRODUTO_100_PONTOS = 0 
+
+-- 1. FUNÇÃO: Configura o placar e carrega os dados salvos quando o jogador entra
+local function onPlayerAdded(player)
+	local leaderstats = Instance.new("Folder")
+	leaderstats.Name = "leaderstats"
+	leaderstats.Parent = player
+
+	local pontos = Instance.new("IntValue")
+	pontos.Name = "Pontos"
+	pontos.Value = 0
+	pontos.Parent = leaderstats
+
+	-- Carrega os dados salvos do jogador
+	local playerUserId = "Player_" .. player.UserId
+	local sucesso, dadosSalvos = pcall(function()
+		return meuJogoDataStore:GetAsync(playerUserId)
+	end)
+
+	if sucesso and dadosSalvos then
+		pontos.Value = dadosSalvos
+		print("Dados de " .. player.Name .. " carregados com sucesso!")
+	else
+		print("Nenhum dado antigo encontrado para " .. player.Name .. ". Começando do zero.")
+	end
+end
+
+-- 2. FUNÇÃO: Salva os dados quando o jogador sai do servidor
+local function onPlayerRemoving(player)
+	local playerUserId = "Player_" .. player.UserId
+	local pontosParaSalvar = player.leaderstats.Pontos.Value
+
+	local sucesso, erro = pcall(function()
+		meuJogoDataStore:SetAsync(playerUserId, pontosParaSalvar)
+	end)
+
+	if sucesso then
+		print("Dados de " .. player.Name .. " salvos com sucesso!")
+	else
+		warn("Erro ao salvar dados: " .. tostring(erro))
+	end
+end
+
+-- 3. FUNÇÃO: Processa a compra com Robux e entrega os pontos imediatamente
+local function processarCompra(receiptInfo)
+	local player = Players:GetPlayerByUserId(receiptInfo.PlayerId)
+	if not player then
+		-- O jogador desconectou antes do processamento acabar, tenta de novo na próxima vez
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+
+	-- Verifica se o ID comprado é o pacote de pontos do seu projeto Atari
+	if receiptInfo.ProductId == ID_PRODUTO_100_PONTOS then
+		local leaderstats = player:FindFirstChild("leaderstats")
+		if leaderstats then
+			local pontos = leaderstats:FindFirstChild("Pontos")
+			if pontos then
+				-- Entrega a recompensa de pontos comprada com Robux reais
+				pontos.Value = pontos.Value + 100
+				print("🎉 Faturamento: " .. player.Name .. " comprou 100 pontos com Robux!")
+				
+				-- Informa ao Roblox que a transação foi concluída com sucesso
+				return Enum.ProductPurchaseDecision.PurchaseGranted
+			end
+		end
+	end
+
+	return Enum.ProductPurchaseDecision.NotProcessedYet
+end
+
+-- Conexão de todos os eventos do servidor
+Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerRemoving:Connect(onPlayerRemoving)
+MarketplaceService.ProcessReceipt = processarCompra
+-- LocalScript dentro do TextButton "BotaoComprar"
+local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
+
+local jogador = Players.LocalPlayer
+local botao = script.Parent
+
+-- ⚠️ IMPORTANTE: Use o mesmo ID do seu Developer Product aqui
+local ID_PRODUTO_100_PONTOS = 0 
+
+-- Estilização Retrô via Código (Caso queira configurar direto por aqui)
+botao.Size = UDim2.new(0, 160, 0, 50)
+botao.Position = UDim2.new(0.02, 0, 0.85, 0) -- Canto inferior esquerdo
+botao.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Vermelho Atari Clássico
+botao.Font = Enum.Font.PressStart2P -- Fonte estilo Pixel Retro de 8-bits
+botao.Text = "+100 PONTOS"
+botao.TextColor3 = Color3.fromRGB(255, 255, 255)
+botao.TextSize = 12
+
+-- Arredonda os cantos imitando cartucho antigo
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 6)
+uiCorner.Parent = botao
+
+-- Evento de clique no botão da tela
+local function aoClicar()
+	MarketplaceService:PromptProductPurchase(jogador, ID_PRODUTO_100_PONTOS)
+end
+
+botao.MouseButton1Click:Connect(aoClicar)
+-- Script normal dentro da Part "BlocoLoja"
+local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
+
+local bloco = script.Parent
+-- ⚠️ IMPORTANTE: Use o mesmo ID do seu Developer Product aqui
+local ID_PRODUTO_100_PONTOS = 0 
+
+local deBounce = false -- Evita abrir várias janelas ao mesmo tempo se o jogador pisar muito rápido
+
+local function aoPisar(objetoTocado)
+	local personagem = objetoTocado.Parent
+	local jogador = Players:GetPlayerFromCharacter(personagem)
+	
+	if jogador and not deBounce then
+		deBounce = true
+		
+		-- Abre a janela oficial do Roblox para o jogador comprar com Robux
+		MarketplaceService:PromptProductPurchase(jogador, ID_PRODUTO_100_PONTOS)
+		
+		task.wait(2) -- Tempo de espera antes de permitir ativar o bloco de novo
+		deBounce = false
+	end
+end
+
+bloco.Touched:Connect(aoPisar)
