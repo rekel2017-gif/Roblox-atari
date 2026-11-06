@@ -58,3 +58,45 @@ Roblox, Atari, and whatever sparks my curiosity next.
 
 <!-- Add your preferred social or community links here. -->
 - GitHub: [@your-username](https://github.com/your-username)
+local Players = game:GetService("Players")
+local ContextActionService = game:GetService("ContextActionService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+-- Trava os eixos para o jogo parecer 2D (estilo Atari lateral)
+humanoid.WalkSpeed = 0 
+rootPart.Anchored = true
+
+-- Configurações do "Pixel" do Atari (Tamanho do passo no grid)
+local GRID_SIZE = 4
+local MOVE_DELAY = 0.15
+local lastMove = 0
+
+local function moverAtari(actionName, inputState, inputObject)
+	if inputState ~= Enum.UserInputState.Begin then return end
+	
+	-- Evita comandos rápidos demais (Simula o processador lento do Atari)
+	if tick() - lastMove < MOVE_DELAY then return end
+	lastMove = tick()
+	
+	local currentPos = rootPart.Position
+	
+	if actionName == "IrEsquerda" then
+		rootPart.Position = currentPos + Vector3.new(-GRID_SIZE, 0, 0)
+	elseif actionName == "IrDireita" then
+		rootPart.Position = currentPos + Vector3.new(GRID_SIZE, 0, 0)
+	elseif actionName == "PularAtari" then
+		-- Pulo estilo "teleporte" rápido do Atari
+		rootPart.Position = currentPos + Vector3.new(0, GRID_SIZE * 2, 0)
+		task.wait(0.2)
+		rootPart.Position = rootPart.Position + Vector3.new(0, -GRID_SIZE * 2, 0)
+	end
+end
+
+-- Vincula os botões do teclado aos movimentos travados
+ContextActionService:BindAction("IrEsquerda", moverAtari, false, Enum.KeyCode.A, Enum.KeyCode.Left)
+ContextActionService:BindAction("IrDireita", moverAtari, false, Enum.KeyCode.D, Enum.KeyCode.Right)
+ContextActionService:BindAction("PularAtari", moverAtari, false, Enum.KeyCode.W, Enum.KeyCode.Space)
